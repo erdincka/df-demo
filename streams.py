@@ -1,23 +1,21 @@
-from concurrent.futures import ThreadPoolExecutor
-import os
 import logging
 import httpx
-
-os.environ["LD_LIBRARY_PATH"] = "/opt/mapr/lib:/usr/lib/jvm/java-11-openjdk-11.0.24.0.8-3.el8.x86_64/lib/server/libjvm.so"
 
 from confluent_kafka import Producer, Consumer, KafkaError
 
 logger = logging.getLogger(__name__)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 CONSUMER_GROUP= "devices-app"
 
 def produce(stream: str, topic: str, message: str):
 
-    logger.debug("Stream path: %s", stream)
+    logger.debug("Got message %s for Topic: %s:%s", message, stream, topic)
+
     p = Producer({"streams.producer.default.stream": stream})
 
     try:
-        logger.info("sending message: %s", message)
+        logger.info("Sending: %s", message)
         p.produce(topic, message.encode("utf-8"))
 
     except Exception as error:
@@ -64,13 +62,12 @@ def consume(stream: str, topic: str):
         consumer.close()
 
 
-async def stream_metrics(stream: str, topic: str):
+def stream_metrics(stream: str, topic: str):
     URL = f"https://localhost:8443/rest/stream/topic/info?path={stream}&topic={topic}"
     AUTH = ("mapr", "mapr")
-    logger.debug(URL)
 
-    async with httpx.AsyncClient(verify=False) as client:
-        response = await client.get(URL, auth=AUTH, timeout=2.0)
+    with httpx.Client(verify=False) as client:
+        response = client.get(URL, auth=AUTH, timeout=2.0)
 
         if response is None or response.status_code != 200:
             # possibly not connected or topic not populated yet, just ignore

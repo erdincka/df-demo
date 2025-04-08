@@ -17,7 +17,7 @@ devices = mock_devices()
 def get_device_data():
     return {
         "device_id": random.randint(1, 200),
-        "timestamp": datetime.datetime.now() - datetime.timedelta(seconds=random.randint(0, 3600)),
+        "timestamp": datetime.datetime.now().timestamp() - random.randint(0, 3600), # random timestamp within the last hour
         "temperature": random.uniform(20.0, 30.0),
         "humidity": random.uniform(40.0, 60.0),
         "pressure": random.uniform(980.0, 1020.0),
@@ -26,6 +26,6 @@ def get_device_data():
     }
 
 def get_samples():
-    for _ in range(10):
-        yield get_device_data()
-
+    # for _ in range(10):
+    #     yield get_device_data()
+    return [get_device_data() for _ in range(10)]
