@@ -29,7 +29,8 @@ run_every = st.session_state.run_every if 'monitor' in st.session_state and st.s
 
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 logger.debug("Using topic at: %s:%s", STREAM, TOPIC)
 
 
