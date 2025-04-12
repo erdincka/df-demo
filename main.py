@@ -1,91 +1,128 @@
-import json
-import logging
 import os
 import pandas as pd
+from requests import session
 import streamlit as st
-from streamlit.logger import get_logger
 
-import mock
-from monitoring import get_recent_data
-from streams import produce
+# from streamlit.logger import get_logger
 
-
-class StreamlitLogHandler(logging.Handler):
-    def __init__(self, widget_update_func):
-        super().__init__()
-        self.widget_update_func = widget_update_func
-
-    def emit(self, record):
-        msg = self.format(record)
-        self.widget_update_func(msg)
+import monitoring
+from pages import (
+    bronze_page,
+    info_page,
+    gold_page,
+    ingestion_page,
+    silver_page,
+)
+import settings
+from utils import handle_data_consumption, handle_data_ingestion_file
 
 
 st.set_page_config(page_title="IoT Devices", layout="wide")
-STREAM = "iot/device_metrics"
-TOPIC = "devices"
+
 st.session_state.setdefault("logs", "")
-# st.session_state.setdefault("monitor", False)
-run_every = st.session_state.run_every if 'monitor' in st.session_state and st.session_state.monitor else None
-
-
-logging.basicConfig(level=logging.INFO)
-# logger = logging.getLogger(__name__)
-logger = get_logger(__name__)
-logger.debug("Using topic at: %s:%s", STREAM, TOPIC)
-
-
-# Write logs to session
-def add_to_logs(msg):
-    st.session_state["logs"] += str(msg) + "\n"
-
-
-@st.fragment(run_every=run_every)
-def show_latest_data(STREAM: str, TOPIC: str):
-
-    st.session_state.data = pd.concat(
-        [st.session_state.data, get_recent_data(STREAM, TOPIC)]
-    )
-    st.session_state.data = st.session_state.data[-100:] # Limit to the last 100 entries
-    st.line_chart(st.session_state.data)
+st.session_state.setdefault("topic_stats", None)
+st.session_state.setdefault("bronze_data", None)
+st.session_state.setdefault("silver_data", None)
+st.session_state.setdefault("gold_data", None)
+st.session_state.setdefault("isMonitoring", settings.isMonitoring)
+st.session_state.setdefault("isDebugging", settings.isDebugging)
+st.session_state.setdefault("isStreams", settings.isStreams)
+st.session_state.setdefault("topic_data", pd.DataFrame())
+settings.isMonitoring = (
+    "isMonitoring" in st.session_state and st.session_state.isMonitoring
+)
+settings.isDebugging = (
+    "isDebugging" in st.session_state and st.session_state.isDebugging
+)
+settings.isStreams = "isStreams" in st.session_state and st.session_state.isStreams
 
 
 def build_sidebar():
-    st.sidebar.link_button("Management UI", f"https://{os.environ['USER']}@localhost:8443/app/dfui", type='tertiary')
-    st.sidebar.title("Monitoring")
-    st.sidebar.slider(
-        "Check for updates every: (seconds)", 0.5, 5.0, value=2.0, key="run_every", step=0.5, help="How often to check for new data"
+    cols = st.sidebar.columns(2)
+    cols[0].link_button(
+        "DFUI",
+        f"https://{os.environ['USER']}@localhost:8443/app/dfui",
+        type="tertiary",
+        icon=":material/home:",
     )
-    st.sidebar.toggle("Monitor topic stat", key="monitor", value=False)
+    cols[1].link_button(
+        "MCS",
+        f"https://{os.environ['USER']}@localhost:8443/app/mcs",
+        type="tertiary",
+        icon=":material/settings:",
+    )
+    st.sidebar.toggle("Monitor Topic", key="isMonitoring", value=False)
+    st.sidebar.toggle("Use DF Streams", key="isStreams", value=False)
+    st.sidebar.toggle("Debug", key="isDebugging", value=False)
+
+    if settings.isMonitoring:
+        st.sidebar.title("Monitoring")
+        st.sidebar.slider(
+            "Check for updates every: (seconds)",
+            0.5,
+            5.0,
+            value=2.0,
+            key="run_every",
+            step=0.5,
+            help="Check every X seconds",
+        )
+    # Debug info
+    if settings.isDebugging:
+        st.sidebar.title("Debugging")
+        st.sidebar.write(f"Monitoring: {settings.isMonitoring}")
+        st.sidebar.write(f"DF Streams: {settings.isStreams}")
+        st.sidebar.write(
+            f"From: {settings.STREAM if settings.isStreams else settings.KWPS_STREAM}:{settings.TOPIC}"
+        )
+        st.sidebar.write(f"Data: {st.session_state.topic_stats}")
 
 
-def handle_stream_sampling():
-    messages = mock.get_samples()
-    for msg in messages:
-        logger.debug(f"Sending data: {msg}")
-        if produce(stream=STREAM, topic=TOPIC, message=json.dumps(msg)):
-            logger.info(f"Published: {msg}")
-        else:
-            logger.warning(f"Failed publish {msg}")
+@st.fragment()
+def log_viewer():
+    st.code(st.session_state.logs, language="text", height=300)
+
+
+@st.fragment(run_every=5)
+def read_from_topic():
+    # Subscribe to the stream
+    handle_data_consumption()
+    if st.session_state.topic_data.empty:
+        st.write("No data received yet.")
+    else:
+        with open(settings.BRONZE_DATA_PATH, "w") as f:
+            f.write(st.session_state.topic_data.to_csv(index=False))
+        st.write("Data saved to bronze layer.")
+
+
+def select_file():
+    return st.file_uploader(
+        label="Upload CSV",
+        type=["csv"],
+        on_change=handle_data_ingestion_file,
+        help="Upload a CSV file to ingest data into the system.",
+    )
 
 
 def main():
-
     build_sidebar()
-        
-    st.button("Data ingestion", on_click=handle_stream_sampling, help=f"Publishing to Kafka topic: {STREAM}:{TOPIC}")
+    # Add monitoring chart to sidebar (TODO: move to details tab)
+    if st.session_state.isMonitoring:
+        monitoring.update_monitoring_metrics()
+        with st.sidebar:
+            st.line_chart(st.session_state.topic_stats)
 
-    if "data" not in st.session_state:
-        st.session_state.data = get_recent_data(STREAM, TOPIC)
+    # demo_info()
+    # Ingestion Page
+    ingestion_page()
 
-    with st.sidebar:
-        show_latest_data(STREAM, TOPIC)
+    bronze_page()
 
-    # streamlit_log_handler = StreamlitLogHandler(st.empty().code)
-    streamlit_log_handler = StreamlitLogHandler(add_to_logs)
-    streamlit_log_handler.setLevel(logging.INFO)
-    logger.addHandler(streamlit_log_handler)
-    st.code(st.session_state.get("logs", ""), language="text", height=300)
-    
+    silver_page()
+
+    gold_page()
+
+    log_viewer()
+
 
 if __name__ == "__main__":
     main()

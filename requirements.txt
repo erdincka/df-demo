@@ -1,0 +1,5 @@
+streamlit
+pyiceberg
+httpx
+kafka-python
+mapr-streams-python
