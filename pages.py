@@ -3,7 +3,7 @@ import icons
 import settings
 import pandas as pd
 
-from utils import handle_data_ingestion, handle_data_ingestion_file
+from utils import handle_data_consumption, handle_sample_data, handle_file_upload
 
 
 @st.fragment
@@ -24,16 +24,6 @@ def info_page():
         st.write(
             "The pipeline is designed to be scalable and resilient, with built-in monitoring and alerting."
         )
-
-
-@st.fragment
-def show_topic_data():
-    try:
-        # read_from_topic()
-        pass
-    except Exception as e:
-        st.error(e)
-    st.dataframe(st.session_state.topic_data, height=300, hide_index=True)
 
 
 @st.fragment
@@ -76,32 +66,37 @@ def show_gold_data():
 def ingestion_page():
     i_tab, i_code, i_details = st.tabs(["Ingestion", "Code", "Details"])
     with i_tab:
-        # Present ingestion source
-        cols = st.columns(2)
+        cols = st.columns(3)
+        # Present ingestion sources
         cols[0].button(
-            "Ingest sample data",
-            on_click=handle_data_ingestion,
+            "Generate",
+            on_click=handle_sample_data,
             help=f"Generate sample data and publish to Kafka topic: {settings.STREAM if settings.isStreams else settings.KWPS_STREAM}:{settings.TOPIC}",
             use_container_width=True,
         )
         cols[0].button(
-            "Upload CSV",
-            on_click=handle_data_ingestion_file,
+            "Upload File",
+            on_click=handle_file_upload,
             help=f"Upload a CSV file and publish to Kafka topic: {settings.STREAM if settings.isStreams else settings.KWPS_STREAM}:{settings.TOPIC}",
             use_container_width=True,
         )
-        # Consume Kafka messages
+        cols[1].image(icons.INGEST_TO_KAFKA, width=215)
+        # cols[2].line_chart(
+        #     st.session_state.topic_data,
+        #     height=100
+        # )
+
 
     with i_code:
         pass
         # st.code(get_code_for("__main__", "handle_data_ingestion_file"))
         # st.code(get_code_for("__main__", "handle_data_ingestion"))
-        # st.code(get_code_for("__main__", "read_from_topic"))
     with i_details:
-        st.image(
-            icons.INGESTION_SOURCES, caption="You can ingest from other sources too"
-        )
+        st.write(f"Read from topic: {st.session_state.topic_data.shape}")
+        st.dataframe(st.session_state.topic_data, height=300, hide_index=True)
+        st.write(f"Written to bronze: {st.session_state.bronze_data.shape if st.session_state.bronze_data is not None else 'None'}")
         st.dataframe(st.session_state.bronze_data, height=300, hide_index=True)
+
 
 
 @st.fragment

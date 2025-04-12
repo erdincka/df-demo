@@ -1,24 +1,13 @@
 import os
 import pandas as pd
-from requests import session
 import streamlit as st
 
-# from streamlit.logger import get_logger
-
-import monitoring
-from pages import (
-    bronze_page,
-    info_page,
-    gold_page,
-    ingestion_page,
-    silver_page,
-)
 import settings
-from utils import handle_data_consumption, handle_data_ingestion_file
 
+st.set_page_config(page_title="Data Fabric Pipeline", layout="wide")
 
-st.set_page_config(page_title="IoT Devices", layout="wide")
-
+st.session_state.setdefault("username", os.uname())
+st.session_state.setdefault("password", None)
 st.session_state.setdefault("logs", "")
 st.session_state.setdefault("topic_stats", None)
 st.session_state.setdefault("bronze_data", None)
@@ -35,6 +24,18 @@ settings.isDebugging = (
     "isDebugging" in st.session_state and st.session_state.isDebugging
 )
 settings.isStreams = "isStreams" in st.session_state and st.session_state.isStreams
+
+# Import these after setting the session state
+from pages import (
+    bronze_page,
+    info_page,
+    gold_page,
+    ingestion_page,
+    silver_page,
+)
+from utils import handle_data_consumption, handle_file_upload
+
+import monitoring
 
 
 def build_sidebar():
@@ -69,12 +70,11 @@ def build_sidebar():
     # Debug info
     if settings.isDebugging:
         st.sidebar.title("Debugging")
-        st.sidebar.write(f"Monitoring: {settings.isMonitoring}")
-        st.sidebar.write(f"DF Streams: {settings.isStreams}")
         st.sidebar.write(
-            f"From: {settings.STREAM if settings.isStreams else settings.KWPS_STREAM}:{settings.TOPIC}"
+            f"Kafka Topic: {settings.STREAM if settings.isStreams else settings.KWPS_STREAM}:{settings.TOPIC}"
         )
-        st.sidebar.write(f"Data: {st.session_state.topic_stats}")
+        st.sidebar.write("Session State:")
+        st.sidebar.json(st.session_state)
 
 
 @st.fragment()
@@ -82,7 +82,6 @@ def log_viewer():
     st.code(st.session_state.logs, language="text", height=300)
 
 
-@st.fragment(run_every=5)
 def read_from_topic():
     # Subscribe to the stream
     handle_data_consumption()
@@ -91,14 +90,14 @@ def read_from_topic():
     else:
         with open(settings.BRONZE_DATA_PATH, "w") as f:
             f.write(st.session_state.topic_data.to_csv(index=False))
-        st.write("Data saved to bronze layer.")
+        st.info("Data saved to bronze layer.")
 
 
 def select_file():
     return st.file_uploader(
         label="Upload CSV",
         type=["csv"],
-        on_change=handle_data_ingestion_file,
+        on_change=handle_file_upload,
         help="Upload a CSV file to ingest data into the system.",
     )
 
@@ -111,17 +110,18 @@ def main():
         with st.sidebar:
             st.line_chart(st.session_state.topic_stats)
 
-    # demo_info()
-    # Ingestion Page
+    info_page()
+
     ingestion_page()
 
-    bronze_page()
+    # bronze_page()
 
-    silver_page()
+    # silver_page()
 
-    gold_page()
+    # gold_page()
 
     log_viewer()
+    # read_from_topic()
 
 
 if __name__ == "__main__":

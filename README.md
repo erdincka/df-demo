@@ -1,6 +1,6 @@
-IoT Device Monitoring System
+# Data Fabric Demo
 
-This project is a simple IoT device monitoring system built using Python, Streamlit, using mocked data. The system allows users to monitor device data in real-time.
+This project is a simple data processing pipeline using MapR Streams. It demonstrates a basic data ingestion, transformation, and visualization system.
 
 ### Features
 
@@ -12,28 +12,20 @@ This project is a simple IoT device monitoring system built using Python, Stream
 
 ### Installation
 
-1. Clone the repository: http://git.ez.win.lab/erdincka/devices.git
+1. Clone the repository: http://git.ez.win.lab/erdincka/df-pipeline.git
 
 2. Install dependencies:
 
-- create and activate venv
 
-`python3 -m venv --system-site-package --prompt devices .venv`
-`source .venv/bin/activate`
-
-- mapr-streams-python package
-
-From [Documentation](https://support.hpe.com/hpesc/public/docDisplay?docId=sf000102990en_us&docLocale=en_US):
+Refer to [Documentation](https://support.hpe.com/hpesc/public/docDisplay?docId=sf000102990en_us&docLocale=en_US) for installing mapr-streams-python library.
 
 ```bash
 sudo dnf install -y python3.11-devel gcc
-python3.11 -m venv --prompt devices .venv`
+python3.11 -m venv --prompt demo .venv`
 source .venv/bin/activate
 pip install streamlit httpx
 pip install --global-option=build_ext --global-option="--library-dirs=/opt/mapr/lib" --global-option="--include-dirs=/opt/mapr/include/" mapr-streams-python
 ```
-
-<!-- cp -R .venv/lib/python3.11/site-packages/mapr_streams_python-0.11.0.2-py3.6.egg-info .venv/lib/python3.6/site-packages/mapr_streams_python -->
 
 **If getting librdkafka.so.1 not found error, run this.**
 
@@ -50,8 +42,8 @@ sudo ldconfig
 
 ```bash
 
-hadoop fs -mkdir iot
-maprcli stream create -path iot/device_metrics -produceperm p -consumeperm p -topicperm p
+hadoop fs -mkdir demo
+maprcli stream create -path demo/metrics -produceperm p -consumeperm p -topicperm p
 
 ```
 

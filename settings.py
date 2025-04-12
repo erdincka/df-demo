@@ -5,13 +5,15 @@ isDebugging = True  # Set this to False in production
 isStreams = False
 isMonitoring = False
 
-STREAM = "iot"
-TOPIC = "devices"
+STREAM = "demo"
+TOPIC = "metrics"
 KWPS_STREAM = f"/var/mapr/mapr.kwps.root/topics/{TOPIC}/stream"
-BRONZE_DATA_PATH = "demo_bronze_data"
-SILVER_DATA_PATH = "demo_silver_data"
-GOLD_DATA_PATH = "demo_gold_data"
+APP_VOLUME = "/user/mapr/demo"
+BRONZE_DATA_PATH = f"{APP_VOLUME}/demo_bronze_data"
+SILVER_DATA_PATH = f"{APP_VOLUME}/demo_silver_data"
+GOLD_DATA_PATH = f"{APP_VOLUME}/demo_gold_data"
 
+logging.getLogger("watchdog").setLevel(logging.WARNING)
 
 class StreamlitLogHandler(logging.Handler):
     def __init__(self, widget_update_func):
@@ -24,7 +26,7 @@ class StreamlitLogHandler(logging.Handler):
         self.widget_update_func(msg)
 
 
-# logging.basicConfig(level=logging.DEBUG if isDebugging else logging.INFO)
+logging.basicConfig(level=logging.DEBUG if isDebugging else logging.INFO)
 logger = logging.getLogger(__name__)
 # logger = get_logger(__name__)
 logger.setLevel(level=logging.DEBUG if isDebugging else logging.INFO)
@@ -42,6 +44,16 @@ streamlit_log_handler.setLevel(logging.INFO)
 logger.addHandler(streamlit_log_handler)
 
 
-# FIX: Ask user for credentials
+# TODO: Ask user for credentials
+# @st.dialog("User Credentials")
 def get_credentials():
-    return "mapr", "mapr"
+    return 'mapr', 'mapr'
+    if st.session_state.password is None:
+        with st.form("credentials_form"):
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
+            submitted = st.form_submit_button("Submit")
+            if submitted:
+                st.session_state.username = username
+                st.session_state.password = password
+    return st.session_state.username, st.session_state.password

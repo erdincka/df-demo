@@ -1,4 +1,5 @@
 import logging
+import uuid
 from kafka import KafkaProducer, KafkaConsumer
 
 import settings
@@ -20,7 +21,9 @@ producer = KafkaProducer(
 consumer = KafkaConsumer(
     api_version=(3, 6),
     auto_offset_reset="earliest",
-    group_id="kafka-consumer-group2",
+    # client_id="kafka-app-consumer",
+    group_id="kafka-consumer-group",
+    # group_id=f"kafka-consumer-group-{uuid.uuid4()}",  # Unique group ID for each consumer
     security_protocol="SASL_PLAINTEXT",
     sasl_mechanism="PLAIN",
     sasl_plain_username=username,
@@ -29,7 +32,11 @@ consumer = KafkaConsumer(
 
 
 def publish(message: str) -> bool:
-    settings.logger.debug("Sending: %s", message)
+    settings.logger.setLevel(
+        level=logging.DEBUG if settings.isDebugging else logging.INFO
+    )
+
+    settings.logger.debug("Publishing message: %s", message)
 
     try:
         producer.send(settings.TOPIC, message.encode("utf-8"))
@@ -45,19 +52,22 @@ def publish(message: str) -> bool:
 
 
 def subscribe():
+    settings.logger.setLevel(
+        level=logging.DEBUG if settings.isDebugging else logging.INFO
+    )
 
+    settings.logger.debug("Subscribing to topic: %s", settings.TOPIC)
+    numMsgConsumed = 0
     try:
         consumer.subscribe([settings.TOPIC])
 
-        numMsgConsumed = 0
         records = consumer.poll(timeout_ms=1000)
-        print(records)
+
         for topic_data, consumer_records in records.items():
             for consumer_record in consumer_records:
                 yield str(consumer_record.value.decode("utf-8"))
                 numMsgConsumed += 1
         settings.logger.info("Messages consumed: " + str(numMsgConsumed))
-        # consumer.commit_async(callback=settings.logger.warning)
 
     except Exception as error:
         settings.logger.warning(error)

@@ -9,7 +9,7 @@ import settings
 from streams import consume, produce
 
 
-def handle_data_ingestion_file(file):
+def handle_file_upload(file):
     settings.logger.info(file)
 
     with open(file, "rb") as f:
@@ -19,31 +19,22 @@ def handle_data_ingestion_file(file):
         pass
 
 
-def handle_data_ingestion():
+def handle_sample_data():
     messages = mock.get_samples()
-    for msg in messages:
-        settings.logger.debug(f"Sending data: {msg}")
-        if settings.isStreams:
-            if produce(message=json.dumps(msg)):
-                settings.logger.info(f"Published: {msg}")
-            else:
-                settings.logger.warning(f"Failed publish {msg}")
+    for message in messages:
+        settings.logger.debug(f"Sending data: {message}")
+        data_sent = produce(message=json.dumps(message)) if settings.isStreams else publish(message=json.dumps(message))
+        if data_sent:
+            settings.logger.info(f"Published: {message}")
         else:
-            publish(message=json.dumps(msg))
+            settings.logger.warning(f"Failed publish {message}")
 
 
 def handle_data_consumption():
-    if settings.isStreams:
-        settings.logger.debug(f"Reading from DF Stream: {settings.STREAM}")
-        for message in consume():
-            settings.logger.debug(f"Received: {message}")
-            st.session_state.topic_data = pd.concat(
-                [st.session_state.topic_data, pd.DataFrame([json.loads(message)])]
-            )
-    else:
-        settings.logger.debug(f"Reading from Kafka topic: {settings.KWPS_STREAM}")
-        for message in subscribe():
-            settings.logger.debug(f"Received: {message}")
-            st.session_state.topic_data = pd.concat(
-                [st.session_state.topic_data, pd.DataFrame([json.loads(message)])]
-            )
+    settings.logger.debug(f"Reading from DF Stream: {settings.STREAM if settings.isStreams else settings.KWPS_STREAM}")
+    
+    for message in consume() if settings.isStreams else subscribe():
+        settings.logger.debug(f"Received: {message}")
+        st.session_state.topic_data = pd.concat(
+            [st.session_state.topic_data, pd.DataFrame([json.loads(message)])]
+        )
