@@ -1,14 +1,15 @@
 import logging
 import streamlit as st
+from streamlit.logger import get_logger
 
-isDebugging = True  # Set this to False in production
+isDebugging = False  # Set this to False in production
 isStreams = False
 isMonitoring = False
 
 STREAM = "demo"
 TOPIC = "metrics"
 KWPS_STREAM = f"/var/mapr/mapr.kwps.root/topics/{TOPIC}/stream"
-APP_VOLUME = "/user/mapr/demo"
+APP_VOLUME = "."
 BRONZE_DATA_PATH = f"{APP_VOLUME}/demo_bronze_data"
 SILVER_DATA_PATH = f"{APP_VOLUME}/demo_silver_data"
 GOLD_DATA_PATH = f"{APP_VOLUME}/demo_gold_data"
@@ -25,19 +26,16 @@ class StreamlitLogHandler(logging.Handler):
         msg = self.format(record)
         self.widget_update_func(msg)
 
+FORMAT = '%(asctime)s %(levelname)s %(filename)s:%(lineno)d (%(funcName)s) - %(message)s'
+logging.basicConfig(format=FORMAT, level=logging.WARNING)
 
-logging.basicConfig(level=logging.DEBUG if isDebugging else logging.INFO)
-logger = logging.getLogger(__name__)
-# logger = get_logger(__name__)
+logger = get_logger(__name__)
 logger.setLevel(level=logging.DEBUG if isDebugging else logging.INFO)
-
 
 # Write logs to session
 def add_to_logs(msg):
     st.session_state.logs += str(msg) + "\n"
 
-
-# logger.addHandler(StreamlitLogHandler(add_to_logs))
 # streamlit_log_handler = StreamlitLogHandler(st.empty().code)
 streamlit_log_handler = StreamlitLogHandler(add_to_logs)
 streamlit_log_handler.setLevel(logging.INFO)

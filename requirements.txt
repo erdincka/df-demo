@@ -3,3 +3,4 @@ pyiceberg
 httpx
 kafka-python
 mapr-streams-python
+sqlalchemy

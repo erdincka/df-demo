@@ -1,9 +1,9 @@
 import streamlit as st
-import icons
+import iceberger
 import settings
 import pandas as pd
 
-from utils import handle_data_consumption, handle_sample_data, handle_file_upload
+from utils import label_category, set_topic_index
 
 
 @st.fragment
@@ -28,14 +28,55 @@ def info_page():
 
 @st.fragment
 def show_bronze_data():
-    try:
-        with open(settings.BRONZE_DATA_PATH, "r") as f:
-            bronze_data = pd.read_csv(f)
-        # Show ingested data (bronze)
-        st.dataframe(bronze_data, height=300, hide_index=True)
-    except FileNotFoundError:
-        st.error(f"File not found at {settings.BRONZE_DATA_PATH}")
-        bronze_data = None
+    keys = st.session_state.topic_data.keys()
+    cols = st.columns(3, gap="medium", vertical_alignment="center")
+    with cols[0]:
+        st.multiselect(
+            "Remove", keys, placeholder="Columns to remove", key="remove_columns"
+        )
+        st.write(f"Remove: {st.session_state.remove_columns}")
+    with cols[1]:
+        st.selectbox(
+            "Mask",
+            [k for k in keys if k not in st.session_state.remove_columns],
+            index=None,
+            placeholder="Column to mask",
+            key="mask_column",
+        )
+        st.write(f"Mask: {st.session_state.mask_column}")
+    with cols[2]:
+        st.selectbox(
+            "Label",
+            [k for k in keys if k not in st.session_state.remove_columns],
+            index=None,
+            placeholder="Apply category using AI",
+            key="label_column",
+        )
+        st.write(f"Label: {st.session_state.label_column}")
+
+    # Data transformation
+    df: pd.DataFrame = st.session_state.topic_data.copy()
+    if st.session_state.remove_columns:
+        df.drop(columns=st.session_state.remove_columns, inplace=True)
+    if st.session_state.mask_column:
+        df[st.session_state.mask_column] = df[st.session_state.mask_column].apply(
+            lambda x: str(x)[:2] + "*****"
+        )
+    if st.session_state.label_column:
+        df["category_type"] = df[st.session_state.label_column].apply(
+            lambda x: label_category(x)
+        )
+    st.dataframe(df, height=300)
+    st.button(
+        "Save transformed data",
+        on_click=iceberger.write,
+        kwargs={
+            "tier": "bronze",
+            "tablename": "transformed_data",
+            "records": df.to_dict(orient="records"),
+            "id_field": "timestamp",
+        },
+    )
 
 
 @st.fragment
@@ -64,54 +105,47 @@ def show_gold_data():
 
 @st.fragment
 def ingestion_page():
-    i_tab, i_code, i_details = st.tabs(["Ingestion", "Code", "Details"])
-    with i_tab:
-        cols = st.columns(3)
-        # Present ingestion sources
-        cols[0].button(
-            "Generate",
-            on_click=handle_sample_data,
-            help=f"Generate sample data and publish to Kafka topic: {settings.STREAM if settings.isStreams else settings.KWPS_STREAM}:{settings.TOPIC}",
-            use_container_width=True,
+    if not st.session_state.topic_data.empty:
+        fields = st.session_state.topic_data.columns
+        st.selectbox(
+            "Choose Index",
+            fields,
+            index=None,
+            key="topic_index",
+            placeholder="Select an index",
+            on_change=set_topic_index,
         )
-        cols[0].button(
-            "Upload File",
-            on_click=handle_file_upload,
-            help=f"Upload a CSV file and publish to Kafka topic: {settings.STREAM if settings.isStreams else settings.KWPS_STREAM}:{settings.TOPIC}",
-            use_container_width=True,
-        )
-        cols[1].image(icons.INGEST_TO_KAFKA, width=215)
-        # cols[2].line_chart(
-        #     st.session_state.topic_data,
-        #     height=100
-        # )
+        st.write(st.session_state.topic_index)
 
-
-    with i_code:
-        pass
-        # st.code(get_code_for("__main__", "handle_data_ingestion_file"))
-        # st.code(get_code_for("__main__", "handle_data_ingestion"))
-    with i_details:
-        st.write(f"Read from topic: {st.session_state.topic_data.shape}")
-        st.dataframe(st.session_state.topic_data, height=300, hide_index=True)
-        st.write(f"Written to bronze: {st.session_state.bronze_data.shape if st.session_state.bronze_data is not None else 'None'}")
-        st.dataframe(st.session_state.bronze_data, height=300, hide_index=True)
-
+    st.line_chart(
+        st.session_state.bronze_data,
+        height=180,
+    )
+    # with i_code:
+    #     # st.code(get_code_for("__main__", "handle_data_ingestion_file"))
+    #     # st.code(get_code_for("__main__", "handle_data_ingestion"))
+    # with i_details:
+    #     st.write(f"Read from topic: {st.session_state.topic_data.shape}")
+    #     st.dataframe(st.session_state.topic_data, height=300, hide_index=True)
+    #     st.write(f"Written to bronze: {st.session_state.bronze_data.shape if st.session_state.bronze_data is not None else 'None'}")
+    #     st.dataframe(st.session_state.bronze_data, height=300, hide_index=True)
 
 
 @st.fragment
 def bronze_page():
-    bronze_tab, bronze_code, bronze_details = st.tabs(
-        ["Bronze Data", "Code", "Details"]
-    )
-    with bronze_tab:
-        # Read data from file
-        show_bronze_data()
-    with bronze_code:
-        # st.code(get_code_for("iceberger", "find_all"))
-        st.code(None)
-    with bronze_details:
-        st.write("Details about the bronze data")
+    # bronze_tab, bronze_code, bronze_details = st.tabs(
+    #     ["Bronze Data", "Code", "Details"]
+    # )
+    # with bronze_tab:
+    #     # Read data from file
+    show_bronze_data()
+
+
+# with bronze_code:
+#     # st.code(get_code_for("iceberger", "find_all"))
+#     st.code(None)
+# with bronze_details:
+#     st.write("Details about the bronze data")
 
 
 @st.fragment

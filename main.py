@@ -1,12 +1,13 @@
 import os
+from pwd import getpwuid
 import pandas as pd
 import streamlit as st
 
 import settings
 
-st.set_page_config(page_title="Data Fabric Pipeline", layout="wide")
+st.set_page_config(page_title="Data Fabric Pipeline", layout="wide", initial_sidebar_state="collapsed")
 
-st.session_state.setdefault("username", os.uname())
+st.session_state.setdefault("username", getpwuid(os.getuid()).pw_name)
 st.session_state.setdefault("password", None)
 st.session_state.setdefault("logs", "")
 st.session_state.setdefault("topic_stats", None)
@@ -33,7 +34,7 @@ from pages import (
     ingestion_page,
     silver_page,
 )
-from utils import handle_data_consumption, handle_file_upload
+from utils import handle_sample_data, read_from_topic, handle_file_upload
 
 import monitoring
 
@@ -79,18 +80,7 @@ def build_sidebar():
 
 @st.fragment()
 def log_viewer():
-    st.code(st.session_state.logs, language="text", height=300)
-
-
-def read_from_topic():
-    # Subscribe to the stream
-    handle_data_consumption()
-    if st.session_state.topic_data.empty:
-        st.write("No data received yet.")
-    else:
-        with open(settings.BRONZE_DATA_PATH, "w") as f:
-            f.write(st.session_state.topic_data.to_csv(index=False))
-        st.info("Data saved to bronze layer.")
+    st.code(st.session_state.logs, language="text", height=200)
 
 
 def select_file():
@@ -112,17 +102,40 @@ def main():
 
     info_page()
 
-    ingestion_page()
+    with st.container(border=True):
+        st.write("Data ingestion")
+        cols = st.columns([20, 80], border=True, gap='medium', vertical_alignment='center')
+        cols[0].button(
+            "To Kafka Topic",
+            on_click=handle_sample_data,
+            help=f"Generate sample data and publish to Kafka topic: {settings.STREAM if settings.isStreams else settings.KWPS_STREAM}:{settings.TOPIC}",
+            use_container_width=True,
+        )
+        cols[0].button(
+            "Upload File",
+            on_click=handle_file_upload,
+            help=f"Upload a CSV file and publish to Kafka topic: {settings.STREAM if settings.isStreams else settings.KWPS_STREAM}:{settings.TOPIC}",
+            use_container_width=True,
+        )
+            
+        with cols[1]:
+            ingestion_page()
 
-    # bronze_page()
+
+    if st.session_state.topic_data.empty:
+        st.error("No data available. Please upload a file or generate sample data.")
+    else:
+        with st.container(border=True):
+            st.write("Data Transformation")
+            bronze_page()
 
     # silver_page()
 
     # gold_page()
 
     log_viewer()
-    # read_from_topic()
-
+    # Start streaming from topic at app start
+    # read_from_topic() 
 
 if __name__ == "__main__":
     main()

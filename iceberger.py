@@ -51,7 +51,7 @@ def get_catalog():
         catalog = SqlCatalog(
             "default",
             **{
-                "uri": f"sqlite:///{settings.BRONZE_DATA_PATH}/iceberg.db",
+                "uri": f"sqlite:///{settings.APP_VOLUME}/iceberg.db",
                 "py-io-impl": "pyiceberg.io.pyarrow.PyArrowFileIO",
             },
         )
@@ -60,11 +60,11 @@ def get_catalog():
         settings.logger.warning("Iceberg Catalog error: %s", error)
 
     finally:
-        settings.settings.logger.info("Got new catalog for Iceberg")
+        settings.logger.info("Got new catalog for Iceberg")
         return catalog
 
 
-def write(tier: str, tablename: str, records: list) -> bool:
+def write(tier: str, tablename: str, records: list, id_field: str = "_id") -> bool:
     """
     Write rows into iceberg table
 
@@ -103,7 +103,7 @@ def write(tier: str, tablename: str, records: list) -> bool:
         incoming = pd.DataFrame.from_dict(records)
 
         merged = pd.concat([existing, incoming]).drop_duplicates(
-            subset="_id", keep="last"
+            subset=id_field, keep="last"
         )
 
         settings.logger.info(f"Appending {merged.shape[0]} records to {tablename}")
