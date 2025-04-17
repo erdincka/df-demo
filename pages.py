@@ -131,19 +131,21 @@ def silver_page():
             key="group_by",
             placeholder="Select column to group by",
         )
+        cols[0].write(f"Group By: {st.session_state.group_by}")
         cols[1].multiselect("Aggregate",
-            ["sum", "mean", "min", "max", "avg"],
+            ["sum", "mean", "min", "max", "count"],
             key="aggr_by",
             placeholder="Select functions to aggregate",
         )
+        cols[1].write(f"Aggregation By: {st.session_state.aggr_by}")
         df: pd.DataFrame = st.session_state.silver_data.copy()
         if st.session_state.group_by:
-            print(df.groupby(st.session_state.group_by).head())
-        if len(st.session_state.aggr_by) > 0:
-            df.agg(st.session_state.aggr_by)
-        st.dataframe(df, height=300)
-        if st.button("Save to feature data store"):
-            save_to_gold(df)
+            grouped_data = df.groupby(st.session_state.group_by).aggregate(st.session_state.aggr_by if len(st.session_state.aggr_by) > 0 else "sum")
+            st.dataframe(grouped_data)
+        else:
+            st.dataframe(df, height=300)
+        if st.button("Save to feature data store", disabled=st.session_state.group_by is None or len(st.session_state.aggr_by) == 0):
+            save_to_gold(grouped_data)
 
 
 @st.fragment

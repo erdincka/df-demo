@@ -113,8 +113,4 @@ def main():
     # handle_topic_consume()
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        print("DO WHATEVER HERE", e)  # 👈Modify this line 
-        raise e
+    main()

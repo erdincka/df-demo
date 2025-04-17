@@ -77,7 +77,7 @@ def save_to_silver(df: pd.DataFrame):
 
 
 def save_to_gold(df: pd.DataFrame):
-    table_name = f"group_by_{st.session_state.group_by}_aggr_by_{'.'.join(st.session_state.aggr_by)}"
+    table_name = f"group_by_{st.session_state.group_by}_aggr_by_{'_'.join(st.session_state.aggr_by)}"
     if iceberger.write(
         tier="gold",
         tablename=table_name,
