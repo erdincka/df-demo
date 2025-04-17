@@ -1,6 +1,7 @@
 import os
 from pwd import getpwuid
 import pandas as pd
+from requests import session
 import streamlit as st
 
 import settings
@@ -11,30 +12,29 @@ st.session_state.setdefault("username", getpwuid(os.getuid()).pw_name)
 st.session_state.setdefault("password", None)
 st.session_state.setdefault("logs", "")
 st.session_state.setdefault("topic_stats", None)
-st.session_state.setdefault("bronze_data", None)
-st.session_state.setdefault("silver_data", None)
-st.session_state.setdefault("gold_data", None)
 st.session_state.setdefault("isMonitoring", settings.isMonitoring)
 st.session_state.setdefault("isDebugging", settings.isDebugging)
 st.session_state.setdefault("isStreams", settings.isStreams)
 st.session_state.setdefault("topic_data", pd.DataFrame())
-settings.isMonitoring = (
-    "isMonitoring" in st.session_state and st.session_state.isMonitoring
-)
-settings.isDebugging = (
-    "isDebugging" in st.session_state and st.session_state.isDebugging
-)
-settings.isStreams = "isStreams" in st.session_state and st.session_state.isStreams
+st.session_state.setdefault("bronze_data", pd.DataFrame())
+st.session_state.setdefault("silver_data", pd.DataFrame())
+st.session_state.setdefault("gold_data", pd.DataFrame())
+# settings.isMonitoring = (
+#     "isMonitoring" in st.session_state and st.session_state.isMonitoring
+# )
+# settings.isDebugging = (
+#     "isDebugging" in st.session_state and st.session_state.isDebugging
+# )
+# settings.isStreams = "isStreams" in st.session_state and st.session_state.isStreams
 
 # Import these after setting the session state
 from pages import (
     bronze_page,
     info_page,
     gold_page,
-    ingestion_page,
+    streaming_page,
     silver_page,
 )
-from utils import handle_sample_data, read_from_topic, handle_file_upload
 
 import monitoring
 
@@ -78,18 +78,8 @@ def build_sidebar():
         st.sidebar.json(st.session_state)
 
 
-@st.fragment()
 def log_viewer():
-    st.code(st.session_state.logs, language="text", height=200)
-
-
-def select_file():
-    return st.file_uploader(
-        label="Upload CSV",
-        type=["csv"],
-        on_change=handle_file_upload,
-        help="Upload a CSV file to ingest data into the system.",
-    )
+    st.code(st.session_state.logs, language="text", height=200, line_numbers=True)
 
 
 def main():
@@ -104,38 +94,27 @@ def main():
 
     with st.container(border=True):
         st.write("Data ingestion")
-        cols = st.columns([20, 80], border=True, gap='medium', vertical_alignment='center')
-        cols[0].button(
-            "To Kafka Topic",
-            on_click=handle_sample_data,
-            help=f"Generate sample data and publish to Kafka topic: {settings.STREAM if settings.isStreams else settings.KWPS_STREAM}:{settings.TOPIC}",
-            use_container_width=True,
-        )
-        cols[0].button(
-            "Upload File",
-            on_click=handle_file_upload,
-            help=f"Upload a CSV file and publish to Kafka topic: {settings.STREAM if settings.isStreams else settings.KWPS_STREAM}:{settings.TOPIC}",
-            use_container_width=True,
-        )
-            
-        with cols[1]:
-            ingestion_page()
+        streaming_page()
 
+    with st.container(border=True):
+        st.write("Data Transformation")
+        bronze_page()
 
-    if st.session_state.topic_data.empty:
-        st.error("No data available. Please upload a file or generate sample data.")
-    else:
-        with st.container(border=True):
-            st.write("Data Transformation")
-            bronze_page()
+    with st.container(border=True):
+        st.write("Data Aggregation")
+        silver_page()
 
-    # silver_page()
-
-    # gold_page()
+    with st.container(border=True):
+        st.write("Data Products")
+        gold_page()
 
     log_viewer()
     # Start streaming from topic at app start
-    # read_from_topic() 
+    # handle_topic_consume()
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print("DO WHATEVER HERE", e)  # 👈Modify this line 
+        raise e

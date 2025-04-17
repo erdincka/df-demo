@@ -8,7 +8,8 @@ import settings
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 CONSUMER_GROUP = "streams-consumer"
-producer = Producer({"streams.producer.default.stream": settings.STREAM})
+# producer = Producer({"streams.producer.default.stream": settings.STREAM})
+producer = Producer({})
 consumer = Consumer(
     {
         "group.id": CONSUMER_GROUP,

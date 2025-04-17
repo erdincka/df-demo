@@ -51,7 +51,8 @@ def get_catalog():
         catalog = SqlCatalog(
             "default",
             **{
-                "uri": f"sqlite:///{settings.APP_VOLUME}/iceberg.db",
+                # creating catalog in working directory
+                "uri": f"sqlite:///iceberg.db",
                 "py-io-impl": "pyiceberg.io.pyarrow.PyArrowFileIO",
             },
         )
@@ -64,7 +65,7 @@ def get_catalog():
         return catalog
 
 
-def write(tier: str, tablename: str, records: list, id_field: str = "_id") -> bool:
+def write(tier: str, tablename: str, records: list) -> bool:
     """
     Write rows into iceberg table
 
@@ -86,32 +87,46 @@ def write(tier: str, tablename: str, records: list, id_field: str = "_id") -> bo
 
         table = None
 
+        # tbl = pa.Table.from_pylist(records)
+        tbl = pa.Table.from_pandas(pd.DataFrame.from_records(records))
+
         # Create table if missing
         try:
             table = catalog.create_table(
                 f"{tier}.{tablename}",
-                schema=pa.Table.from_pylist(records).schema,
+                schema=tbl.schema,
                 location=warehouse_path,
             )
 
-        except:
+        except Exception as error:
+            print(f"Error: {error}")
             settings.logger.info("Table exists, appending to: " + tablename)
             table = catalog.load_table(f"{tier}.{tablename}")
 
         existing = table.scan().to_pandas()
+        # print("Existing:")
+        # print(existing.head())
 
         incoming = pd.DataFrame.from_dict(records)
+        # print("Incoming:")
+        # print(incoming.head())
 
-        merged = pd.concat([existing, incoming]).drop_duplicates(
-            subset=id_field, keep="last"
-        )
+        if existing.empty:
+            merged = incoming
+        else:
+            merged = pd.concat([existing, incoming]).drop_duplicates(keep="last")
 
-        settings.logger.info(f"Appending {merged.shape[0]} records to {tablename}")
+        settings.logger.info(f"Appending {incoming.shape[0]} records to {tablename}")
         try:
             table.append(pa.Table.from_pandas(merged, preserve_index=False))
+            # upd = table.upsert(incoming, join_cols=incoming.columns)
+            # print(upd)
+            # print(table.scan().to_pandas())
+            # print(table.schema())
 
         except Exception as error:
             settings.logger.warning(error)
+            return False
 
         return True
 
@@ -183,7 +198,7 @@ def find_all(tier: str, tablename: str):
             return df
 
         except Exception as error:
-            settings.logger.warning("Failed to scan table %s: %s", "cust", error)
+            settings.logger.warning("Failed to scan table %s: %s", tablename, error)
             return None
 
 

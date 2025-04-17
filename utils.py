@@ -1,41 +1,48 @@
 import json
 from typing import Any
-import numpy as np
 import streamlit as st
 import pandas as pd
 
+import iceberger
 from kafkaing import publish, subscribe
 import mock
 import settings
 from streams import consume, produce
 
 
-def handle_file_upload(file):
-    settings.logger.info(file)
+def publish_messages():
+    for message in st.session_state.topic_data.to_dict(orient="records"):
+        if produce(message=json.dumps(message)) if settings.isStreams else publish(message=json.dumps(message)):
+            settings.logger.debug(f"Published: {message}")
+        else:
+            settings.logger.warning(f"Failed to publish message: {message}")
 
-    with open(file, "rb") as f:
-        bytes = f.read()
-        print(bytes)
-        # TODO: Handle the data ingestion here
-        pass
+@st.dialog("File upload")
+def handle_file_upload():
+    file = st.file_uploader("CSV or JSON files", ["csv", "json"], accept_multiple_files=False)
+    if file:
+        match file.type:
+            case "text/csv":
+                # contents = file.getvalue().decode("utf-8")
+                st.session_state.topic_data = pd.read_csv(file)
+            case "application/json":
+                contents = json.load(file)
+                st.session_state.topic_data = pd.DataFrame(contents)
+            case _:
+                st.error("Unsupported file type")
+        publish_messages()
+        st.rerun()
 
 
 def handle_sample_data():
     messages = mock.get_samples()
-    for message in messages:
-        settings.logger.debug(f"Sending data: {message}")
-        data_sent = produce(message=json.dumps(message)) if settings.isStreams else publish(message=json.dumps(message))
-        if data_sent:
-            settings.logger.info(f"Published: {message}")
-            # TODO: Bypassing topic subscription, loading directly on session state for now
-            new_metric = pd.DataFrame(message, columns=list(message.keys()), index=[0])
-            st.session_state.topic_data = pd.concat(
-                [st.session_state.topic_data, new_metric]
-            )
-        else:
-            settings.logger.warning(f"Failed publish {message}")
+    st.session_state.topic_data = pd.DataFrame(messages)
+    publish_messages()
+    #         new_metric['timestamp'] = pd.to_datetime(int(message["timestamp"]), unit="s")
+    #         new_metric.set_index('timestamp', inplace=True)
 
-def read_from_topic():
+
+def handle_topic_consume():
     settings.logger.debug(f"Streaming from {settings.STREAM if settings.isStreams else settings.KWPS_STREAM}")
 
     # Subscribe to the stream
@@ -45,8 +52,10 @@ def read_from_topic():
             [st.session_state.topic_data, pd.DataFrame([json.loads(message)])]
         )
         st.rerun()
-
     settings.logger.debug("Done with streaming!")
+    # FIX: Enable this after testing
+    # copy streamed data into bronze table
+    # st.session_state.bronze_data = st.session_state.topic_data.copy()
 
 
 def label_category(metric: Any):
@@ -55,11 +64,26 @@ def label_category(metric: Any):
     return type(metric).__name__
 
 
-def set_topic_index():
-    if st.session_state.topic_index is not None:
-        print("FOUND INDEX! SETTING IT NOW!")
-        st.session_state.topic_data.set_index(st.session_state.topic_index, inplace=True)
-    if "topic_index" in st.session_state and st.session_state.topic_index == 'timestamp':
-        print("FOUND TIMESTAMP! SETTING IT TO DATE!")
-        st.session_state.topic_data['timestamp'] = pd.to_datetime(int(st.session_state.topic_data['timestamp']), unit="s")
-        st.session_state.topic_data.set_index('timestamp', inplace=True)
+def save_to_silver(df: pd.DataFrame):
+    if iceberger.write(
+        tier="silver",
+        tablename="refined",
+        # "records": df.to_dict(orient="records"),
+        records=df.to_dict(orient="series"),
+    ):
+        st.session_state.silver_data = iceberger.find_all("silver", "refined")
+    else:
+        st.error("Failed to save silver data.")    
+
+
+def save_to_gold(df: pd.DataFrame):
+    table_name = f"group_by_{st.session_state.group_by}_aggr_by_{'.'.join(st.session_state.aggr_by)}"
+    if iceberger.write(
+        tier="gold",
+        tablename=table_name,
+        records=df.to_dict(orient="series"),
+    ):
+        st.session_state.gold_data = iceberger.find_all("gold", table_name)
+    else:
+        st.error("Failed to save gold data.")    
+

@@ -2,5 +2,6 @@ streamlit
 pyiceberg
 httpx
 kafka-python
-mapr-streams-python
+# mapr-streams-python
+confluent_kafka
 sqlalchemy

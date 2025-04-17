@@ -2,17 +2,13 @@ import logging
 import streamlit as st
 from streamlit.logger import get_logger
 
-isDebugging = False  # Set this to False in production
+isDebugging = True  # Set this to False in production
 isStreams = False
 isMonitoring = False
 
 STREAM = "demo"
 TOPIC = "metrics"
 KWPS_STREAM = f"/var/mapr/mapr.kwps.root/topics/{TOPIC}/stream"
-APP_VOLUME = "."
-BRONZE_DATA_PATH = f"{APP_VOLUME}/demo_bronze_data"
-SILVER_DATA_PATH = f"{APP_VOLUME}/demo_silver_data"
-GOLD_DATA_PATH = f"{APP_VOLUME}/demo_gold_data"
 
 logging.getLogger("watchdog").setLevel(logging.WARNING)
 
@@ -40,7 +36,6 @@ def add_to_logs(msg):
 streamlit_log_handler = StreamlitLogHandler(add_to_logs)
 streamlit_log_handler.setLevel(logging.INFO)
 logger.addHandler(streamlit_log_handler)
-
 
 # TODO: Ask user for credentials
 # @st.dialog("User Credentials")

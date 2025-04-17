@@ -21,7 +21,7 @@ Refer to [Documentation](https://support.hpe.com/hpesc/public/docDisplay?docId=s
 
 ```bash
 sudo dnf install -y python3.11-devel gcc
-python3.11 -m venv --prompt demo .venv`
+python3.11 -m venv --prompt demo .venv
 source .venv/bin/activate
 pip install streamlit httpx
 pip install --global-option=build_ext --global-option="--library-dirs=/opt/mapr/lib" --global-option="--include-dirs=/opt/mapr/include/" mapr-streams-python

@@ -30,4 +30,4 @@ def get_device_data():
 def get_samples():
     # for _ in range(10):
     #     yield get_device_data()
-    return [get_device_data() for _ in range(3)]
+    return [get_device_data() for _ in range(100)]

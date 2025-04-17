@@ -1,9 +1,8 @@
 import streamlit as st
-import iceberger
 import settings
 import pandas as pd
 
-from utils import label_category, set_topic_index
+from utils import handle_file_upload, handle_sample_data, label_category, save_to_gold, save_to_silver
 
 
 @st.fragment
@@ -27,35 +26,16 @@ def info_page():
 
 
 @st.fragment
-def show_bronze_data():
-    keys = st.session_state.topic_data.keys()
-    cols = st.columns(3, gap="medium", vertical_alignment="center")
-    with cols[0]:
-        st.multiselect(
-            "Remove", keys, placeholder="Columns to remove", key="remove_columns"
-        )
-        st.write(f"Remove: {st.session_state.remove_columns}")
-    with cols[1]:
-        st.selectbox(
-            "Mask",
-            [k for k in keys if k not in st.session_state.remove_columns],
-            index=None,
-            placeholder="Column to mask",
-            key="mask_column",
-        )
-        st.write(f"Mask: {st.session_state.mask_column}")
-    with cols[2]:
-        st.selectbox(
-            "Label",
-            [k for k in keys if k not in st.session_state.remove_columns],
-            index=None,
-            placeholder="Apply category using AI",
-            key="label_column",
-        )
-        st.write(f"Label: {st.session_state.label_column}")
+def show_refined_data():
+    # This page is used to display the refined data before it is written to the data warehouse.
+    # Silver data is where the refined & stored data is shown & processed.
 
     # Data transformation
     df: pd.DataFrame = st.session_state.topic_data.copy()
+    if st.session_state.index_column:
+        df.set_index(st.session_state.index_column, inplace=True)
+        # if st.session_state.index_column.lower() == "timestamp":
+        #     df.index = pd.to_datetime(st.session_state.topic_data['timestamp'], unit="s")
     if st.session_state.remove_columns:
         df.drop(columns=st.session_state.remove_columns, inplace=True)
     if st.session_state.mask_column:
@@ -67,110 +47,108 @@ def show_bronze_data():
             lambda x: label_category(x)
         )
     st.dataframe(df, height=300)
+    # st.code(df.head())
     st.button(
-        "Save transformed data",
-        on_click=iceberger.write,
-        kwargs={
-            "tier": "bronze",
-            "tablename": "transformed_data",
-            "records": df.to_dict(orient="records"),
-            "id_field": "timestamp",
-        },
+        "Save Refined Data",
+        on_click=save_to_silver,
+        args=[df]
     )
 
 
-@st.fragment
-def show_silver_data():
-    try:
-        with open(settings.SILVER_DATA_PATH, "r") as f:
-            silver_data = pd.read_csv(f)
-        # Show ingested data (silver)
-        st.dataframe(silver_data, height=300, hide_index=True)
-    except FileNotFoundError:
-        st.error(f"File not found at {settings.SILVER_DATA_PATH}")
-        silver_data = None
-
-
-@st.fragment
-def show_gold_data():
-    try:
-        with open(settings.GOLD_DATA_PATH, "r") as f:
-            gold_data = pd.read_csv(f)
-        # Show ingested data (gold)
-        st.dataframe(gold_data, height=300, hide_index=True)
-    except FileNotFoundError:
-        st.error(f"File not found at {settings.GOLD_DATA_PATH}")
-        gold_data = None
-
-
-@st.fragment
-def ingestion_page():
-    if not st.session_state.topic_data.empty:
-        fields = st.session_state.topic_data.columns
-        st.selectbox(
-            "Choose Index",
-            fields,
-            index=None,
-            key="topic_index",
-            placeholder="Select an index",
-            on_change=set_topic_index,
-        )
-        st.write(st.session_state.topic_index)
-
-    st.line_chart(
-        st.session_state.bronze_data,
-        height=180,
+def streaming_page():
+    cols = st.columns([20, 80], gap='medium')
+    cols[0].button(
+        "Publish sample data",
+        on_click=handle_sample_data,
+        help=f"Generate sample data and publish to Kafka topic: {settings.STREAM if settings.isStreams else settings.KWPS_STREAM}:{settings.TOPIC}",
+        use_container_width=True,
     )
-    # with i_code:
-    #     # st.code(get_code_for("__main__", "handle_data_ingestion_file"))
-    #     # st.code(get_code_for("__main__", "handle_data_ingestion"))
-    # with i_details:
-    #     st.write(f"Read from topic: {st.session_state.topic_data.shape}")
-    #     st.dataframe(st.session_state.topic_data, height=300, hide_index=True)
-    #     st.write(f"Written to bronze: {st.session_state.bronze_data.shape if st.session_state.bronze_data is not None else 'None'}")
-    #     st.dataframe(st.session_state.bronze_data, height=300, hide_index=True)
+    cols[0].button(
+        "Publish from file",
+        on_click=handle_file_upload,
+        help=f"Upload a file and publish to Kafka topic: {settings.STREAM if settings.isStreams else settings.KWPS_STREAM}:{settings.TOPIC}",
+        use_container_width=True,
+    )
+        
+    with cols[1]:
+        if st.session_state.topic_data.empty:
+            st.error("No data in topic, start streaming...")
+            return
+        else:
+            st.write(f"Read from topic: {st.session_state.topic_data.shape}")
+            st.dataframe(st.session_state.topic_data, height=180)
 
 
-@st.fragment
 def bronze_page():
-    # bronze_tab, bronze_code, bronze_details = st.tabs(
-    #     ["Bronze Data", "Code", "Details"]
-    # )
-    # with bronze_tab:
-    #     # Read data from file
-    show_bronze_data()
+    if st.session_state.topic_data.empty:
+        st.error("No raw data yet.")
+        return
+    else:
+        keys = st.session_state.topic_data.columns
+        cols = st.columns(4, gap="medium", vertical_alignment="center")
+        with cols[0]:
+            st.selectbox("Index", 
+                options=keys, 
+                index=None, 
+                placeholder="Select column for index",
+                key="index_column")
+            st.write(f"Index: {st.session_state.index_column}")
+        with cols[1]:
+            st.multiselect(
+                "Remove", [k for k in keys if k != st.session_state.index_column], placeholder="Columns to remove", key="remove_columns"
+            )
+            st.write(f"Remove: {st.session_state.remove_columns}")
+        with cols[2]:
+            st.selectbox(
+                "Mask",
+                [k for k in keys if k not in st.session_state.remove_columns and k != st.session_state.index_column],
+                index=None,
+                placeholder="Column to mask",
+                key="mask_column",
+            )
+            st.write(f"Mask: {st.session_state.mask_column}")
+        with cols[3]:
+            st.selectbox(
+                "Label",
+                [k for k in keys if k not in st.session_state.remove_columns and k != st.session_state.index_column],
+                index=None,
+                placeholder="Apply category using AI",
+                key="label_column",
+            )
+            st.write(f"Label: {st.session_state.label_column}")
+        show_refined_data()
 
 
-# with bronze_code:
-#     # st.code(get_code_for("iceberger", "find_all"))
-#     st.code(None)
-# with bronze_details:
-#     st.write("Details about the bronze data")
-
-
-@st.fragment
+st.fragment
 def silver_page():
-    silver_tab, silver_code, silver_details = st.tabs(
-        ["Silver Data", "Code", "Details"]
-    )
-    with silver_tab:
-        # Read data from file
-        show_silver_data()
-    with silver_code:
-        # st.code(get_code_for("iceberger", "find_all"))
-        st.code(None)
-    with silver_details:
-        st.write("Details about the silver data")
+    if st.session_state.silver_data.empty:
+        st.error("No refined data yet.")
+    else:
+        cols = st.columns(2)
+        cols[0].selectbox("Group By",
+            st.session_state.silver_data.columns,
+            index=None,
+            key="group_by",
+            placeholder="Select column to group by",
+        )
+        cols[1].multiselect("Aggregate",
+            ["sum", "mean", "min", "max", "avg"],
+            key="aggr_by",
+            placeholder="Select functions to aggregate",
+        )
+        df: pd.DataFrame = st.session_state.silver_data.copy()
+        if st.session_state.group_by:
+            print(df.groupby(st.session_state.group_by).head())
+        if len(st.session_state.aggr_by) > 0:
+            df.agg(st.session_state.aggr_by)
+        st.dataframe(df, height=300)
+        if st.button("Save to feature data store"):
+            save_to_gold(df)
 
 
 @st.fragment
 def gold_page():
-    gold_tab, gold_code, gold_details = st.tabs(["Gold Data", "Code", "Details"])
-    with gold_tab:
-        # Read data from file
-        show_gold_data()
-    with gold_code:
-        # st.code(get_code_for("iceberger", "find_all"))
-        st.code(None)
-    with gold_details:
-        st.write("Details about the gold data")
+    if st.session_state.gold_data.empty:
+        st.error("No consolidated data yet.")
+    else:
+        st.dataframe(st.session_state.gold_data)
