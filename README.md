@@ -12,6 +12,15 @@ This project is a simple data processing pipeline using MapR Streams. It demonst
 
 ### Installation
 
+#### If needed, start dev sandbox in local docker machine and run future commands inside the container.
+
+`docker run -d --name mapr --privileged -p 8443:8443 -p 8501:8501 -p 9000:9000 -e clusterName=maprdemo.io -e isSecure --hostname maprdemo.io maprtech/dev-sandbox-container`
+
+and then
+
+`docker exec -it mapr bash`
+
+
 1. Clone the repository: http://git.ez.win.lab/erdincka/df-pipeline.git
 
 2. Install dependencies:
@@ -20,7 +29,7 @@ This project is a simple data processing pipeline using MapR Streams. It demonst
 Refer to [Documentation](https://support.hpe.com/hpesc/public/docDisplay?docId=sf000102990en_us&docLocale=en_US) for installing mapr-streams-python library.
 
 ```bash
-sudo dnf install -y python3.11-devel gcc
+sudo apt install -y python3.11-dev gcc
 python3.11 -m venv --prompt demo .venv
 source .venv/bin/activate
 pip install streamlit httpx
@@ -36,7 +45,7 @@ sudo ldconfig
 
 - Authenticate to MapR
 
-`maprlogin password`
+`echp mapr | maprlogin password`
 
 - Create stream
 
@@ -49,7 +58,7 @@ maprcli stream create -path demo/metrics -produceperm p -consumeperm p -topicper
 
 ### Usage
 
-1. Start the Streamlit app by running `streamlit run main.py`.
+1. Start the Streamlit app by running `LD_LIBRARY_PATH=/opt/mapr/lib streamlit run main.py`.
 2. Enter a topic in the text input field.
 3. Click the "Start Stream" button to begin monitoring device data.
 

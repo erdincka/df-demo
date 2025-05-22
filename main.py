@@ -1,7 +1,6 @@
 import os
 from pwd import getpwuid
 import pandas as pd
-from requests import session
 import streamlit as st
 
 import settings
@@ -19,13 +18,6 @@ st.session_state.setdefault("topic_data", pd.DataFrame())
 st.session_state.setdefault("bronze_data", pd.DataFrame())
 st.session_state.setdefault("silver_data", pd.DataFrame())
 st.session_state.setdefault("gold_data", pd.DataFrame())
-# settings.isMonitoring = (
-#     "isMonitoring" in st.session_state and st.session_state.isMonitoring
-# )
-# settings.isDebugging = (
-#     "isDebugging" in st.session_state and st.session_state.isDebugging
-# )
-# settings.isStreams = "isStreams" in st.session_state and st.session_state.isStreams
 
 # Import these after setting the session state
 from pages import (
