@@ -14,53 +14,25 @@ This project is a simple data processing pipeline using MapR Streams. It demonst
 
 #### If needed, start dev sandbox in local docker machine and run future commands inside the container.
 
-`docker run -d --name mapr --privileged -p 8443:8443 -p 8501:8501 -p 9000:9000 -e clusterName=maprdemo.io -e isSecure --hostname maprdemo.io maprtech/dev-sandbox-container`
+`docker run -d --name mapr --privileged -p 8443:8443 -p 8501:8501 -p 9000:9000 -p 2222:22 -e clusterName=maprdemo.io -e isSecure --hostname maprdemo.io maprtech/dev-sandbox-container`
 
 and then
 
 `docker exec -it mapr bash`
 
+1. Clone the repository: `apt update && apt install git -y && git clone https://github.com/erdincka/df-demo.git; cd df-demo`
 
-1. Clone the repository: http://git.ez.win.lab/erdincka/df-pipeline.git
+2. Create venv: `apt install python3.11-venv -y && python3.11 -m venv .venv`
 
-2. Install dependencies:
+3. Activate venv: `source .venv/bin/activate`
 
+4. Install requirements: `pip install -r requirements.txt`
 
-Refer to [Documentation](https://support.hpe.com/hpesc/public/docDisplay?docId=sf000102990en_us&docLocale=en_US) for installing mapr-streams-python library.
+5. Authenticate to MapRP: `echo mapr | maprlogin password`
 
-```bash
-sudo apt install -y python3.11-dev gcc
-python3.11 -m venv --prompt demo .venv
-source .venv/bin/activate
-pip install streamlit httpx
-pip install --global-option=build_ext --global-option="--library-dirs=/opt/mapr/lib" --global-option="--include-dirs=/opt/mapr/include/" mapr-streams-python
-```
+6. Create volume: `maprcli volume create -name demo -path /demo -minreplication 1 -nsminreplication 1 -replication 1 -nsreplication 1`
 
-**If getting librdkafka.so.1 not found error, run this.**
-
-```bash
-echo "/opt/mapr/lib" | sudo tee /etc/ld.so.conf.d/mapr-lib.conf`
-sudo ldconfig
-```
-
-- Authenticate to MapR
-
-`echp mapr | maprlogin password`
-
-- Create stream
-
-```bash
-
-hadoop fs -mkdir demo
-maprcli stream create -path demo/metrics -produceperm p -consumeperm p -topicperm p
-
-```
-
-### Usage
-
-1. Start the Streamlit app by running `LD_LIBRARY_PATH=/opt/mapr/lib streamlit run main.py`.
-2. Enter a topic in the text input field.
-3. Click the "Start Stream" button to begin monitoring device data.
+7. Run the application: `streamlit run main.py`.
 
 ### Contributing
 
