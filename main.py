@@ -1,14 +1,11 @@
-import os
-from pwd import getpwuid
+import logging
 import pandas as pd
 import streamlit as st
 
-import settings
+import messaging
 
 st.set_page_config(page_title="Data Fabric Pipeline", layout="wide", initial_sidebar_state="collapsed")
 
-st.session_state.setdefault("username", getpwuid(os.getuid()).pw_name)
-st.session_state.setdefault("password", None)
 st.session_state.setdefault("logs", "")
 st.session_state.setdefault("topic_stats", None)
 st.session_state.setdefault("topic_data", pd.DataFrame())
@@ -25,46 +22,7 @@ from pages import (
     silver_page,
 )
 
-import monitoring
-
-
-def build_sidebar():
-    cols = st.sidebar.columns(2)
-    cols[0].link_button(
-        "DFUI",
-        f"https://{os.environ['USER']}@localhost:8443/app/dfui",
-        type="tertiary",
-        icon=":material/home:",
-    )
-    cols[1].link_button(
-        "MCS",
-        f"https://{os.environ['USER']}@localhost:8443/app/mcs",
-        type="tertiary",
-        icon=":material/settings:",
-    )
-    st.sidebar.toggle("Monitor Topic", key="isMonitoring", value=False)
-    st.sidebar.toggle("Use DF Streams", key="isStreams", value=False)
-    st.sidebar.toggle("Debug", key="isDebugging", value=False)
-
-    if settings.isMonitoring:
-        st.sidebar.title("Monitoring")
-        st.sidebar.slider(
-            "Check for updates every: (seconds)",
-            0.5,
-            5.0,
-            value=2.0,
-            key="run_every",
-            step=0.5,
-            help="Check every X seconds",
-        )
-    # Debug info
-    if settings.isDebugging:
-        st.sidebar.title("Debugging")
-        st.sidebar.write(
-            f"Kafka Topic: {settings.STREAM if settings.isStreams else settings.KWPS_STREAM}:{settings.TOPIC}"
-        )
-        st.sidebar.write("Session State:")
-        st.sidebar.json(st.session_state)
+logger = logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
 
 
 def log_viewer():
@@ -72,32 +30,41 @@ def log_viewer():
 
 
 def main():
-    build_sidebar()
-    # Add monitoring chart to sidebar (TODO: move to details tab)
-    if st.session_state.isMonitoring:
-        monitoring.update_monitoring_metrics()
-        with st.sidebar:
-            st.line_chart(st.session_state.topic_stats)
+    def send_message():
+        message = st.text_input("Enter a message to send:")
+        if message:
+            messaging.producer.send('mytopic', message.encode('utf-8'))
+            st.success("Message sent successfully!")
 
-    info_page()
+    st.title("Kafka Message Producer")
+    send_message()
 
-    with st.container(border=True):
-        st.write("Data ingestion")
-        streaming_page()
+    st.title("Kafka Message Consumer")
 
-    with st.container(border=True):
-        st.write("Data Transformation")
-        bronze_page()
+    st.subheader("Messages from Kafka:")
+    for message in messaging.consumer:
+        st.write(f"Received: {message.value.decode('utf-8')}")
 
-    with st.container(border=True):
-        st.write("Data Aggregation")
-        silver_page()
+    # info_page()
 
-    with st.container(border=True):
-        st.write("Data Products")
-        gold_page()
+    # with st.container(border=True):
+    #     st.write("Data ingestion")
+    #     streaming_page()
 
-    log_viewer()
+    # with st.container(border=True):
+    #     st.write("Data Transformation")
+    #     bronze_page()
+
+    # with st.container(border=True):
+    #     st.write("Data Aggregation")
+    #     silver_page()
+
+    # with st.container(border=True):
+    #     st.write("Data Products")
+    #     gold_page()
+
+    # log_viewer()
+
     # Start streaming from topic at app start
     # handle_topic_consume()
 

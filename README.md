@@ -22,17 +22,19 @@ and then
 
 1. Clone the repository: `apt update && apt install git -y && git clone https://github.com/erdincka/df-demo.git; cd df-demo`
 
-2. Create venv: `apt install python3.11-venv -y && python3.11 -m venv .venv`
+2. Install UV: `curl -LsSf https://astral.sh/uv/install.sh | sh && source ~/.bashrc`
 
-3. Activate venv: `source .venv/bin/activate`
+2. Create venv: `uv venv df-demo`
 
-4. Install requirements: `pip install -r requirements.txt`
+3. Activate env: `source .venv/bin/activate && uv pip install -r requirements.txt`
 
-5. Authenticate to MapRP: `echo mapr | maprlogin password`
+5. Get credentails: `echo mapr | maprlogin password`
 
 6. Create volume: `maprcli volume create -name demo -path /demo -minreplication 1 -nsminreplication 1 -replication 1 -nsreplication 1`
 
-7. Run the application: `streamlit run main.py`.
+7. Mount volume: `mount -t nfs -o nolock,soft localhost:/mapr /mapr`
+
+8. Run the application: `streamlit run main.py`.
 
 ### Contributing
 

@@ -27,7 +27,7 @@ def get_device_data():
     }
 
 
-def get_samples():
+def get_samples(count: int=5):
     # for _ in range(10):
     #     yield get_device_data()
-    return [get_device_data() for _ in range(100)]
+    return [get_device_data() for _ in range(count)]

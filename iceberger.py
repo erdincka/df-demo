@@ -1,10 +1,11 @@
 import datetime
+import logging
 import pandas as pd
 import pyarrow as pa
 from pyiceberg.expressions import EqualTo
 
-import settings
 
+logger = logging.getLogger(__name__)
 
 catalog = None
 
@@ -33,7 +34,7 @@ catalog = None
 #         print(catalog.list_namespaces())
 
 #     except Exception as error:
-#         settings.logger.warning("Iceberg Catalog error: %s", error)
+#         logger.warning("Iceberg Catalog error: %s", error)
 #         ui.notify(f"Iceberg catalog error: {error}", type='negative')
 
 
@@ -58,10 +59,10 @@ def get_catalog():
         )
 
     except Exception as error:
-        settings.logger.warning("Iceberg Catalog error: %s", error)
+        logger.warning("Iceberg Catalog error: %s", error)
 
     finally:
-        settings.logger.info("Got new catalog for Iceberg")
+        logger.info("Got new catalog for Iceberg")
         return catalog
 
 
@@ -100,14 +101,14 @@ def write(tier: str, tablename: str, records: list) -> bool:
 
         except Exception as error:
             print(f"Error: {error}")
-            settings.logger.info("Table exists, appending to: " + tablename)
+            logger.info("Table exists, appending to: " + tablename)
             table = catalog.load_table(f"{tier}.{tablename}")
 
         existing = table.scan().to_pandas()
         # print("Existing:")
         # print(existing.head())
 
-        incoming = pd.DataFrame.from_dict(records)
+        incoming = pd.DataFrame.from_dict(records) # pyright: ignore
         # print("Incoming:")
         # print(incoming.head())
 
@@ -116,7 +117,7 @@ def write(tier: str, tablename: str, records: list) -> bool:
         else:
             merged = pd.concat([existing, incoming]).drop_duplicates(keep="last")
 
-        settings.logger.info(f"Appending {incoming.shape[0]} records to {tablename}")
+        logger.info(f"Appending {incoming.shape[0]} records to {tablename}")
         try:
             table.append(pa.Table.from_pandas(merged, preserve_index=False))
             # upd = table.upsert(incoming, join_cols=incoming.columns)
@@ -125,7 +126,7 @@ def write(tier: str, tablename: str, records: list) -> bool:
             # print(table.schema())
 
         except Exception as error:
-            settings.logger.warning(error)
+            logger.warning(error)
             return False
 
         return True
@@ -141,13 +142,13 @@ def tail(tier: str, tablename: str):
 
     if catalog is not None:
 
-        settings.logger.info("Loading table from %s.%s", tier, tablename)
+        logger.info("Loading table from %s.%s", tier, tablename)
 
         table = catalog.load_table(f"{tier}.{tablename}")
 
         df = table.scan().to_pandas()
 
-        # settings.logger.debug(df)
+        # logger.debug(df)
 
         return df
 
@@ -161,11 +162,11 @@ def history(tier: str, tablename: str):
 
     if catalog is not None:
 
-        settings.logger.info("Loading table: %s.%s", tier, tablename)
+        logger.info("Loading table: %s.%s", tier, tablename)
 
         table = catalog.load_table(f"{tier}.{tablename}")
 
-        settings.logger.info("Got table: %s", table)
+        logger.info("Got table: %s", table)
 
         return [
             {
@@ -198,7 +199,7 @@ def find_all(tier: str, tablename: str):
             return df
 
         except Exception as error:
-            settings.logger.warning("Failed to scan table %s: %s", tablename, error)
+            logger.warning("Failed to scan table %s: %s", tablename, error)
             return None
 
 
@@ -225,7 +226,7 @@ def find_by_field(tier: str, tablename: str, field: str, value: str):
                 f"{tier}.{tablename}",
             )
 
-            settings.logger.info("table path: %s.%s", tier, tablename)
+            logger.info("table path: %s.%s", tier, tablename)
 
             filtered = table.scan(
                 row_filter=EqualTo(field, value),
@@ -236,6 +237,6 @@ def find_by_field(tier: str, tablename: str, field: str, value: str):
             return filtered
 
         except:
-            settings.logger.warning("Cannot scan table: " + tablename)
+            logger.warning("Cannot scan table: " + tablename)
 
         return None

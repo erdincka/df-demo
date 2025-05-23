@@ -2,13 +2,8 @@ import logging
 import streamlit as st
 from streamlit.logger import get_logger
 
-isDebugging = True  # Set this to False in production
-isStreams = False
-isMonitoring = False
-
-STREAM = "demo"
 TOPIC = "metrics"
-KWPS_STREAM = f"/var/mapr/mapr.kwps.root/topics/{TOPIC}/stream"
+STREAM = f"/var/mapr/mapr.kwps.root/topics/{TOPIC}/stream"
 
 logging.getLogger("watchdog").setLevel(logging.WARNING)
 
@@ -23,10 +18,9 @@ class StreamlitLogHandler(logging.Handler):
         self.widget_update_func(msg)
 
 FORMAT = '%(asctime)s %(levelname)s %(filename)s:%(lineno)d (%(funcName)s) - %(message)s'
-logging.basicConfig(format=FORMAT, level=logging.WARNING)
+logging.basicConfig(format=FORMAT, level=logging.INFO)
 
 logger = get_logger(__name__)
-logger.setLevel(level=logging.DEBUG if isDebugging else logging.INFO)
 
 # Write logs to session
 def add_to_logs(msg):
@@ -41,12 +35,12 @@ logger.addHandler(streamlit_log_handler)
 # @st.dialog("User Credentials")
 def get_credentials():
     return 'mapr', 'mapr'
-    if st.session_state.password is None:
-        with st.form("credentials_form"):
-            username = st.text_input("Username")
-            password = st.text_input("Password", type="password")
-            submitted = st.form_submit_button("Submit")
-            if submitted:
-                st.session_state.username = username
-                st.session_state.password = password
-    return st.session_state.username, st.session_state.password
+    # if st.session_state.password is None:
+    #     with st.form("credentials_form"):
+    #         username = st.text_input("Username")
+    #         password = st.text_input("Password", type="password")
+    #         submitted = st.form_submit_button("Submit")
+    #         if submitted:
+    #             st.session_state.username = username
+    #             st.session_state.password = password
+    # return st.session_state.username, st.session_state.password

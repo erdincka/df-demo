@@ -1,9 +1,11 @@
+import logging
 import streamlit as st
 import settings
 import pandas as pd
 
 from utils import handle_file_upload, handle_sample_data, label_category, save_to_gold, save_to_silver
 
+logger = logging.getLogger(__name__)
 
 @st.fragment
 def info_page():
@@ -51,7 +53,7 @@ def show_refined_data():
     st.button(
         "Save Refined Data",
         on_click=save_to_silver,
-        args=[df]
+        args=[df] # pyright: ignore
     )
 
 
@@ -60,13 +62,13 @@ def streaming_page():
     cols[0].button(
         "Publish sample data",
         on_click=handle_sample_data,
-        help=f"Generate sample data and publish to Kafka topic: {settings.STREAM if settings.isStreams else settings.KWPS_STREAM}:{settings.TOPIC}",
+        help=f"Generate sample data and publish to Kafka topic: {settings.STREAM}:{settings.TOPIC}",
         use_container_width=True,
     )
     cols[0].button(
         "Publish from file",
         on_click=handle_file_upload,
-        help=f"Upload a file and publish to Kafka topic: {settings.STREAM if settings.isStreams else settings.KWPS_STREAM}:{settings.TOPIC}",
+        help=f"Upload a file and publish to Kafka topic: {settings.STREAM}:{settings.TOPIC}",
         use_container_width=True,
     )
         
@@ -143,6 +145,7 @@ def silver_page():
             grouped_data = df.groupby(st.session_state.group_by).aggregate(st.session_state.aggr_by if len(st.session_state.aggr_by) > 0 else "sum")
             st.dataframe(grouped_data)
         else:
+            grouped_data = df
             st.dataframe(df, height=300)
         if st.button("Save to feature data store", disabled=st.session_state.group_by is None or len(st.session_state.aggr_by) == 0):
             save_to_gold(grouped_data)

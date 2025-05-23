@@ -2,20 +2,17 @@ import logging
 import pandas as pd
 import streamlit as st
 
+from kafkaing import publish, subscribe
 import settings
-from streams import stream_metrics
+from utils import publish_messages
 
-run_every = st.session_state.run_every if st.session_state.isMonitoring else None
+logger = logging.getLogger(__name__)
 
-
-@st.fragment(run_every=run_every)
+@st.fragment
 def update_monitoring_metrics():
 
-    if not settings.isMonitoring:
-        return
-
     new_data = get_recent_data(
-        stream=settings.STREAM if settings.isStreams else settings.KWPS_STREAM,
+        stream=settings.STREAM,
         topic=settings.TOPIC,
     )
 
@@ -32,23 +29,24 @@ def update_monitoring_metrics():
 
 
 def get_recent_data(stream: str, topic: str):
-    settings.logger.setLevel(
-        level=logging.DEBUG if settings.isDebugging else logging.INFO
-    )
-    settings.logger.debug(f"Streaming from {stream}")
+    logger.debug(f"Streaming from {stream}:{topic}")
 
-    for metric in stream_metrics(stream, topic):
+    for metric in subscribe():
         data = {
-            "Timestamp": [metric["timestamp"]],
+            "Timestamp": [metric["timestamp"]], # pyright: ignore
             "Published": [
-                metric["data"][0]["maxoffset"] + 1
+                metric["data"][0]["maxoffset"] + 1 # pyright: ignore
             ],  # Assuming maxoffset is the last offset + 1
-            "Consumed": [metric["data"][0]["minoffsetacrossconsumers"]],
+            "Consumed": [metric["data"][0]["minoffsetacrossconsumers"]], # pyright: ignore
         }
 
-        settings.logger.debug(f"Got topic metric: {data}")
+        logger.debug(f"Got topic metric: {data}")
 
         df = pd.DataFrame(data, columns=["Timestamp", "Published", "Consumed"])
         df["Timestamp"] = pd.to_datetime(df["Timestamp"], unit="ms")
         df.set_index("Timestamp", inplace=True)
         return df
+
+
+def stream_metric():
+    pass

@@ -1,21 +1,25 @@
 import json
+import logging
 from typing import Any
 import streamlit as st
 import pandas as pd
 
 import iceberger
-from kafkaing import publish, subscribe
+from messaging import publish, subscribe
 import mock
 import settings
-from streams import consume, produce
+
+
+logger = logging.getLogger(__name__)
 
 
 def publish_messages():
     for message in st.session_state.topic_data.to_dict(orient="records"):
-        if produce(message=json.dumps(message)) if settings.isStreams else publish(message=json.dumps(message)):
-            settings.logger.debug(f"Published: {message}")
+        logger.info(message)
+        if publish(message=json.dumps(message)):
+            logger.debug(f"Published: {message}")
         else:
-            settings.logger.warning(f"Failed to publish message: {message}")
+            logger.warning(f"Failed to publish message: {message}")
 
 @st.dialog("File upload")
 def handle_file_upload():
@@ -43,16 +47,16 @@ def handle_sample_data():
 
 
 def handle_topic_consume():
-    settings.logger.debug(f"Streaming from {settings.STREAM if settings.isStreams else settings.KWPS_STREAM}")
+    logger.debug(f"Streaming from {settings.STREAM}")
 
     # Subscribe to the stream
-    for message in consume() if settings.isStreams else subscribe():
-        # settings.logger.debug(f"Received: {message}")
+    for message in subscribe():
+        # logger.debug(f"Received: {message}")
         st.session_state.topic_data = pd.concat(
             [st.session_state.topic_data, pd.DataFrame([json.loads(message)])]
         )
         st.rerun()
-    settings.logger.debug("Done with streaming!")
+    logger.debug("Done with streaming!")
     # FIX: Enable this after testing
     # copy streamed data into bronze table
     # st.session_state.bronze_data = st.session_state.topic_data.copy()
@@ -69,7 +73,7 @@ def save_to_silver(df: pd.DataFrame):
         tier="silver",
         tablename="refined",
         # "records": df.to_dict(orient="records"),
-        records=df.to_dict(orient="series"),
+        records=df.to_dict(orient="series"),  # pyright: ignore
     ):
         st.session_state.silver_data = iceberger.find_all("silver", "refined")
     else:
@@ -81,7 +85,7 @@ def save_to_gold(df: pd.DataFrame):
     if iceberger.write(
         tier="gold",
         tablename=table_name,
-        records=df.to_dict(orient="series"),
+        records=df.to_dict(orient="series"), # pyright: ignore
     ):
         st.session_state.gold_data = iceberger.find_all("gold", table_name)
     else:
