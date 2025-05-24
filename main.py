@@ -33,17 +33,22 @@ def main():
     def send_message():
         message = st.text_input("Enter a message to send:")
         if message:
-            messaging.producer.send('mytopic', message.encode('utf-8'))
-            st.success("Message sent successfully!")
+            try:
+                # Send the message with a topic
+                messaging.producer.produce('mytopic', key='key', value=message.encode('utf-8'))
+                messaging.producer.flush()  # Ensure the message is sent
+                st.success("Message sent successfully!")
+            except Exception as e:
+                st.error(f"Error sending message: {e}")
 
-    st.title("Kafka Message Producer")
-    send_message()
+    st.title("Kafka Message Producer (confluent_kafka)")
 
-    st.title("Kafka Message Consumer")
+    # send_message()
+    # st.title("Kafka Message Consumer")
 
-    st.subheader("Messages from Kafka:")
-    for message in messaging.consumer:
-        st.write(f"Received: {message.value.decode('utf-8')}")
+    # st.subheader("Messages from Kafka:")
+    # for message in messaging.consumer:
+    #     st.write(f"Received: {message.value.decode('utf-8')}")
 
     # info_page()
 
